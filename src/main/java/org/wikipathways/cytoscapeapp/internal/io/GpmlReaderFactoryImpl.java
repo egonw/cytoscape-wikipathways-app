@@ -169,7 +169,7 @@ public class GpmlReaderFactoryImpl implements GpmlReaderFactory  {
       DelayedView delayedView = null;
       switch(conversionMethod) {
       case PATHWAY:
-        delayedView = (new GpmlToPathway(eventHelper, annots, pathway, network)).convert();
+        delayedView = (new GpmlToPathway(eventHelper, pathway, network)).convert();
         break;
       case NETWORK:
         delayedView = (new GpmlToNetwork(eventHelper, pathway, network)).convert();

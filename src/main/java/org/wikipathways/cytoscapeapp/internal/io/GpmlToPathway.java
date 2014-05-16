@@ -61,7 +61,6 @@ public class GpmlToPathway {
   final List<DelayedVizProp> cyDelayedVizProps = new ArrayList<DelayedVizProp>();
 
   final CyEventHelper     cyEventHelper;
-  final Annots            cyAnnots;
 	final Pathway           pvPathway;
 	final CyNetwork         cyNet;
   final CyTable           cyNodeTbl;
@@ -79,11 +78,9 @@ public class GpmlToPathway {
    */
 	public GpmlToPathway(
       final CyEventHelper     cyEventHelper,
-      final Annots            cyAnnots,
       final Pathway           pvPathway,
       final CyNetwork         cyNet) {
     this.cyEventHelper = cyEventHelper;
-    this.cyAnnots = cyAnnots;
 		this.pvPathway = pvPathway;
 		this.cyNet = cyNet;
     this.cyNodeTbl = cyNet.getTable(CyNode.class, CyNetwork.DEFAULT_ATTRS);
