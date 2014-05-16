@@ -46,7 +46,7 @@ public class GpmlReaderFactoryImpl implements GpmlReaderFactory  {
   final GpmlVizStyle vizStyle;
 
   final Map<CyNetwork,GpmlConversionMethod> conversionMethods = new HashMap<CyNetwork,GpmlConversionMethod>();
-  final Map<CyNetwork,List<DelayedVizProp>> pendingVizProps = new HashMap<CyNetwork,List<DelayedVizProp>>();
+  final Map<CyNetwork,DelayedView> delayedViews = new HashMap<CyNetwork,DelayedView>();
 
   public GpmlReaderFactoryImpl(
       final CyEventHelper eventHelper,
@@ -89,7 +89,7 @@ public class GpmlReaderFactoryImpl implements GpmlReaderFactory  {
 
     final TaskIterator iterator = new TaskIterator();
 
-    iterator.append(new ApplyVizProps(gpmlNetwork, networkView));
+    iterator.append(new ApplyDelayedView(gpmlNetwork, networkView));
 
     if (GpmlConversionMethod.NETWORK.equals(method)) {
       final CyLayoutAlgorithm layout = layoutMgr.getLayout("force-directed");
@@ -166,17 +166,17 @@ public class GpmlReaderFactoryImpl implements GpmlReaderFactory  {
         network.getRow(network).set(CyNetwork.NAME, netNaming.getSuggestedNetworkTitle(name));
       }
 
-      List<DelayedVizProp> vizProps = null;
+      DelayedView delayedView = null;
       switch(conversionMethod) {
       case PATHWAY:
-        vizProps = (new GpmlToPathway(eventHelper, annots, pathway, network)).convert();
+        delayedView = (new GpmlToPathway(eventHelper, annots, pathway, network)).convert();
         break;
       case NETWORK:
-        vizProps = (new GpmlToNetwork(eventHelper, pathway, network)).convert();
+        delayedView = (new GpmlToNetwork(eventHelper, pathway, network)).convert();
         break;
       }
 
-      pendingVizProps.put(network, vizProps);
+      delayedViews.put(network, delayedView);
     }
 
     public void cancel() {
@@ -190,21 +190,21 @@ public class GpmlReaderFactoryImpl implements GpmlReaderFactory  {
     }
   }
 
-  class ApplyVizProps extends AbstractTask {
+  class ApplyDelayedView extends AbstractTask {
     final CyNetwork network;
     final CyNetworkView view;
 
-    public ApplyVizProps(final CyNetwork network, final CyNetworkView view) {
+    public ApplyDelayedView(final CyNetwork network, final CyNetworkView view) {
       this.network = network;
       this.view = view;
     }
 
     public void run(TaskMonitor monitor) {
-      final List<DelayedVizProp> vizProps = pendingVizProps.get(network);
+      final DelayedView delayedView = delayedViews.get(network);
       eventHelper.flushPayloadEvents(); // guarantee that all node and edge views have been created
-      DelayedVizProp.applyAll(view, vizProps); // apply our visual style
-      vizProps.clear(); // be nice to the GC
-      pendingVizProps.remove(network);
+      DelayedVizProp.applyAll(view, delayedView.vizProps); // apply our visual style
+      delayedView.vizProps.clear(); // be nice to the GC
+      delayedViews.remove(network);
     }
   }
 

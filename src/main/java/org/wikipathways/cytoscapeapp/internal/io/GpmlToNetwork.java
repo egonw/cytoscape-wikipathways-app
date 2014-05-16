@@ -77,7 +77,7 @@ public class GpmlToNetwork {
 	/**
 	 * Convert the pathway given in the constructor.
 	 */
-	public List<DelayedVizProp> convert() {
+	public DelayedView convert() {
 		network.getTable(CyNode.class, CyNetwork.DEFAULT_ATTRS).createColumn("GraphID", String.class, false);
 		network.getTable(CyNode.class, CyNetwork.DEFAULT_ATTRS).createColumn("GeneID", String.class, false);
 		network.getTable(CyNode.class, CyNetwork.DEFAULT_ATTRS).createColumn("Datasource", String.class, false);
@@ -103,7 +103,7 @@ public class GpmlToNetwork {
 		// clear our data structures just to be nice to the GC
 		nodes.clear();
 
-		return delayedVizProps;
+		return new DelayedView(delayedVizProps, null);
 	}
 
 	/**

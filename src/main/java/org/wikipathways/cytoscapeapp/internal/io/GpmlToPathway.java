@@ -93,7 +93,7 @@ public class GpmlToPathway {
   /**
    * Convert the pathway given in the constructor.
    */
-	public List<DelayedVizProp> convert() {
+	public DelayedView convert() {
     setupCyTables();
 
     // convert by each pathway element type
@@ -108,7 +108,7 @@ public class GpmlToPathway {
     // clear our data structures just to be nice to the GC
     pvToCyNodes.clear();
 
-    return cyDelayedVizProps;
+    return new DelayedView(cyDelayedVizProps, null);
 	}
 
   /**
