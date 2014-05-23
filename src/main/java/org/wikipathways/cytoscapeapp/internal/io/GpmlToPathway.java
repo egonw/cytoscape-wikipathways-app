@@ -3,6 +3,9 @@ package org.wikipathways.cytoscapeapp.internal.io;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.geom.Point2D;
+import java.awt.geom.Rectangle2D;
+import java.awt.geom.AffineTransform;
+import java.awt.Shape;
 
 import java.util.Map;
 import java.util.HashMap;
@@ -33,6 +36,10 @@ import org.cytoscape.event.CyEventHelper;
 import org.cytoscape.view.model.CyNetworkView;
 import org.cytoscape.view.model.DiscreteRange;
 import org.cytoscape.view.model.VisualProperty;
+
+import org.cytoscape.view.presentation.annotations.Annotation;
+import org.cytoscape.view.presentation.annotations.ShapeAnnotation;
+
 import org.cytoscape.view.presentation.property.BasicVisualLexicon;
 import org.cytoscape.view.presentation.property.NodeShapeVisualProperty;
 import org.cytoscape.view.presentation.property.ArrowShapeVisualProperty;
@@ -57,8 +64,10 @@ public class GpmlToPathway {
    * Maps a GPML pathway element to its representative CyNode in the network.
    */
   final Map<GraphLink.GraphIdContainer,CyNode> pvToCyNodes = new HashMap<GraphLink.GraphIdContainer,CyNode>();
+  final Map<GraphLink.GraphIdContainer,DelayedAnnot> pvToCyAnnots = new HashMap<GraphLink.GraphIdContainer,DelayedAnnot>();
 
   final List<DelayedVizProp> cyDelayedVizProps = new ArrayList<DelayedVizProp>();
+  final List<DelayedAnnot>   cyDelayedAnnots   = new ArrayList<DelayedAnnot>();
 
   final CyEventHelper     cyEventHelper;
 	final Pathway           pvPathway;
@@ -105,7 +114,7 @@ public class GpmlToPathway {
     // clear our data structures just to be nice to the GC
     pvToCyNodes.clear();
 
-    return new DelayedView(cyDelayedVizProps, null);
+    return new DelayedView(cyDelayedVizProps, cyDelayedAnnots);
 	}
 
   /**
@@ -141,6 +150,10 @@ public class GpmlToPathway {
       tableStore.setup(cyEdgeTbl);
     }
   }
+
+  /* ========================================= 
+       Converters
+     ========================================= */
 
   /**
    * Converts a PathVisio static property value (or values) to a value
@@ -255,6 +268,18 @@ public class GpmlToPathway {
     }
   };
 
+
+  /**
+   * Uses PathVisio's {@code StaticProperty.COLOR} or {@code StaticProperty.FILLCOLOR}
+   * and returns a hex string of the color.
+   */
+  static final Converter PV_COLOR_INT_CONVERTER = new Converter() {
+    public Object toCyValue(Object[] pvValues) {
+      final Color c = (Color) pvValues[0];
+      return c.getRGB();
+    }
+  };
+
   /**
    * Uses PathVisio's {@code StaticProperty.TRANSPARENT} to a String.
    */
@@ -269,6 +294,34 @@ public class GpmlToPathway {
       }
     }
   };
+
+  /**
+   * Estimates the start X of a pathway element.
+   * Uses PathVisio's {@code StaticProperty.CENTERX} and {@code StaticProperty.WIDTH} to a Double.
+   */
+  static final Converter PV_START_X_EST_CONVERTER = new Converter() {
+    public Object toCyValue(Object[] pvValues) {
+      final Double centerX = (Double) pvValues[0];
+      final Double width = (Double) pvValues[1];
+      return centerX - width / 2.0;
+    }
+  };
+
+  /**
+   * Estimates the start X of a pathway element.
+   * Uses PathVisio's {@code StaticProperty.CENTERY} and {@code StaticProperty.HEIGHT} to a Double.
+   */
+  static final Converter PV_START_Y_EST_CONVERTER = new Converter() {
+    public Object toCyValue(Object[] pvValues) {
+      final Double centerY = (Double) pvValues[0];
+      final Double height = (Double) pvValues[1];
+      return centerY - height / 2.0;
+    }
+  };
+
+  /* ========================================= 
+       Extracters
+     ========================================= */
 
   /**
    * Extracts values from a PathVisio pathway element
@@ -295,8 +348,13 @@ public class GpmlToPathway {
     public static final Extracter TEXT_LABEL          = new BasicExtracter(StaticProperty.TEXTLABEL);
     public static final Extracter X                   = new BasicExtracter(StaticProperty.CENTERX);
     public static final Extracter Y                   = new BasicExtracter(StaticProperty.CENTERY);
+    public static final Extracter START_X_EST         = new BasicExtracter(PV_START_X_EST_CONVERTER, StaticProperty.CENTERX, StaticProperty.WIDTH);
+    public static final Extracter START_Y_EST         = new BasicExtracter(PV_START_Y_EST_CONVERTER, StaticProperty.CENTERY, StaticProperty.HEIGHT);
     public static final Extracter WIDTH               = new BasicExtracter(StaticProperty.WIDTH);
     public static final Extracter HEIGHT              = new BasicExtracter(StaticProperty.HEIGHT);
+    public static final Extracter ROTATION            = new BasicExtracter(StaticProperty.ROTATION);
+    public static final Extracter COLOR_INT           = new BasicExtracter(PV_COLOR_INT_CONVERTER, StaticProperty.COLOR);
+    public static final Extracter FILL_COLOR_INT      = new BasicExtracter(PV_COLOR_INT_CONVERTER, StaticProperty.FILLCOLOR);
     public static final Extracter COLOR_STRING        = new BasicExtracter(PV_COLOR_STRING_CONVERTER, StaticProperty.COLOR);
     public static final Extracter FILL_COLOR_STRING   = new BasicExtracter(PV_COLOR_STRING_CONVERTER, StaticProperty.FILLCOLOR);
     public static final Extracter COLOR               = new BasicExtracter(StaticProperty.COLOR);
@@ -365,6 +423,10 @@ public class GpmlToPathway {
     }
   }
 
+  /* ========================================= 
+       Table Stores
+     ========================================= */
+
   /**
    * Stores values produced by an {@code Extractor}
    * into a Cytoscape table column.
@@ -426,6 +488,10 @@ public class GpmlToPathway {
       cyTable.getRow(cyNetObj.getSUID()).set(cyColName, cyValue);
     }
   }
+
+  /* ========================================= 
+       Viz Table Stores
+     ========================================= */
 
   /**
    * A specific kind of {@code TableStore} whose column stores
@@ -600,6 +666,10 @@ public class GpmlToPathway {
     }
   }
 
+  /* ========================================= 
+       Viz Prop Stores
+     ========================================= */
+
   /**
    * Takes a PathVisio element value and stores
    * the equivalent Cytoscape visual bypass value in a {@code DelayedVizProp}.
@@ -657,6 +727,48 @@ public class GpmlToPathway {
         cyDelayedVizProps.add(props[i]);
       }
     }
+  }
+
+  /* ========================================= 
+       Arg Map Stores
+     ========================================= */
+
+  static interface ArgMapStore {
+    void store(final PathwayElement elem, final Map<String,String> argMap);
+  }
+
+  static class BasicArgMapStore implements ArgMapStore {
+    static final ArgMapStore X = new BasicArgMapStore(BasicExtracter.START_X_EST, Annotation.X);
+    static final ArgMapStore Y = new BasicArgMapStore(BasicExtracter.START_Y_EST, Annotation.Y);
+    static final ArgMapStore SHAPE_WIDTH = new BasicArgMapStore(BasicExtracter.WIDTH, ShapeAnnotation.WIDTH);
+    static final ArgMapStore SHAPE_HEIGHT = new BasicArgMapStore(BasicExtracter.HEIGHT, ShapeAnnotation.HEIGHT);
+    //static final ArgMapStore SHAPE_ROTATION = new BasicArgMapStore(BasicExtracter.ROTATION, ShapeAnnotation.ROTATION);
+    static final ArgMapStore SHAPE_FILL_COLOR = new BasicArgMapStore(BasicExtracter.FILL_COLOR_INT, ShapeAnnotation.FILLCOLOR);
+    static final ArgMapStore SHAPE_BORDER_COLOR = new BasicArgMapStore(BasicExtracter.COLOR_INT, ShapeAnnotation.EDGECOLOR);
+    static final ArgMapStore SHAPE_BORDER_THICKNESS = new BasicArgMapStore(BasicExtracter.NODE_LINE_THICKNESS, ShapeAnnotation.EDGETHICKNESS);
+
+    final Extracter extracter;
+    final String key;
+
+    public BasicArgMapStore(final Extracter extracter, final String key) {
+      this.extracter = extracter;
+      this.key = key;
+    }
+
+    public void store(final PathwayElement pvElem, final Map<String,String> cyArgMap) {
+      final Object cyVal = extracter.extract(pvElem);
+      if (cyVal != null) {
+        cyArgMap.put(key, cyVal.toString());
+      }
+    }
+  }
+
+  Map<String,String> store(final PathwayElement pvElem, final ArgMapStore ... argMapStores) {
+    final Map<String,String> cyArgMap = new HashMap<String,String>(argMapStores.length);
+    for (final ArgMapStore argMapStore : argMapStores) {
+      argMapStore.store(pvElem, cyArgMap);
+    }
+    return cyArgMap;
   }
 
   /*
@@ -732,6 +844,7 @@ public class GpmlToPathway {
      Shapes
    ========================================================
   */
+
   static final TableStore IS_GPML_SHAPE = new BasicTableStore("IsGPMLShape", Boolean.class, new DefaultExtracter(true));
 
   private void convertShapes() {
@@ -742,32 +855,32 @@ public class GpmlToPathway {
     }
   }
 
+  static final ArgMapStore SHAPE_CANVAS_ARG_STORE = new BasicArgMapStore(new DefaultExtracter(ShapeAnnotation.BACKGROUND), ShapeAnnotation.CANVAS);
+
   private void convertShape(final PathwayElement pvShape) {
-    final CyNode cyNode = cyNet.addNode();
-    pvToCyNodes.put(pvShape, cyNode);
-    store(cyNodeTbl, cyNode, pvShape,
-      BasicTableStore.GRAPH_ID,
-      BasicTableStore.TEXT_LABEL,
-      IS_GPML_SHAPE
-    );
-    store(cyNode, pvShape,
-      BasicVizPropStore.NODE_X,
-      BasicVizPropStore.NODE_Y,
-      BasicVizPropStore.NODE_WIDTH,
-      BasicVizPropStore.NODE_HEIGHT,
-      BasicVizPropStore.NODE_FILL_COLOR,
-      BasicVizPropStore.NODE_COLOR,
-      BasicVizPropStore.NODE_LABEL_FONT,
-      BasicVizPropStore.NODE_LABEL_SIZE,
-      BasicVizPropStore.NODE_ALWAYS_TRANSPARENT,
-      BasicVizPropStore.NODE_BORDER_STYLE,
-      BasicVizPropStore.NODE_BORDER_THICKNESS,
-      BasicVizPropStore.NODE_SHAPE,
-      SELECTED_COLOR
-    );
+    final Shape shape = extractShape(pvShape);
+    final DelayedAnnot delayedAnnot = DelayedAnnot.newShape(shape, store(pvShape,
+      BasicArgMapStore.X,
+      BasicArgMapStore.Y,
+      BasicArgMapStore.SHAPE_WIDTH,
+      BasicArgMapStore.SHAPE_HEIGHT,
+      BasicArgMapStore.SHAPE_FILL_COLOR,
+      BasicArgMapStore.SHAPE_BORDER_COLOR,
+      BasicArgMapStore.SHAPE_BORDER_THICKNESS,
+      //BasicArgMapStore.SHAPE_ROTATION,
+      SHAPE_CANVAS_ARG_STORE
+      ));
+    cyDelayedAnnots.add(delayedAnnot);
+    pvToCyAnnots.put(pvShape, delayedAnnot);
   }
 
-  
+  Shape extractShape(final PathwayElement pvShape) {
+    final Double originalW = (Double) pvShape.getStaticProperty(StaticProperty.WIDTH);
+    final Double originalH = (Double) pvShape.getStaticProperty(StaticProperty.HEIGHT);
+    final Shape originalShape = pvShape.getShapeType().getShape(originalW, originalH);
+    return originalShape;
+  }
+
   /*
    ========================================================
      States

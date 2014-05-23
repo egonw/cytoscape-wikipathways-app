@@ -202,8 +202,13 @@ public class GpmlReaderFactoryImpl implements GpmlReaderFactory  {
     public void run(TaskMonitor monitor) {
       final DelayedView delayedView = delayedViews.get(network);
       eventHelper.flushPayloadEvents(); // guarantee that all node and edge views have been created
+
       DelayedVizProp.applyAll(view, delayedView.vizProps); // apply our visual style
       delayedView.vizProps.clear(); // be nice to the GC
+
+      DelayedAnnot.applyAll(view, annots, delayedView.annots);
+      delayedView.annots.clear();
+
       delayedViews.remove(network);
     }
   }

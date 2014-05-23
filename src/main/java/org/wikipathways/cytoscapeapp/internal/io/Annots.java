@@ -30,29 +30,21 @@ public class Annots {
     this.textFct = textFct;
   }
 
-  static Map<String,String> ezMap(Object[] elems) {
-    final Map<String,String> map = new HashMap<String,String>();
-    for (int i = 0; i < elems.length; i += 2) {
-      map.put(elems[i].toString(), elems[i+1].toString());
-    }
-    System.out.println("ezMap: " + map.toString());
-    return map;
-  }
 
-  public ArrowAnnotation newArrow(final CyNetworkView netView, Object ... args) {
-    final ArrowAnnotation annot = arrowFct.createAnnotation(ArrowAnnotation.class, netView, ezMap(args));
+  public ArrowAnnotation newArrow(final CyNetworkView netView, final Map<String,String> args) {
+    final ArrowAnnotation annot = arrowFct.createAnnotation(ArrowAnnotation.class, netView, args);
     mgr.addAnnotation(annot);
     return annot;
   }
 
-  public ShapeAnnotation newShape(final CyNetworkView netView, Object ... args) {
-    final ShapeAnnotation annot = shapeFct.createAnnotation(ShapeAnnotation.class, netView, ezMap(args));
+  public ShapeAnnotation newShape(final CyNetworkView netView, final Map<String,String> args) {
+    final ShapeAnnotation annot = shapeFct.createAnnotation(ShapeAnnotation.class, netView, args);
     mgr.addAnnotation(annot);
     return annot;
   }
 
-  public TextAnnotation newText(final CyNetworkView netView, Object ... args) {
-    final TextAnnotation annot = textFct.createAnnotation(TextAnnotation.class, netView, ezMap(args));
+  public TextAnnotation newText(final CyNetworkView netView, final Map<String,String> args) {
+    final TextAnnotation annot = textFct.createAnnotation(TextAnnotation.class, netView, args);
     mgr.addAnnotation(annot);
     return annot;
   }
