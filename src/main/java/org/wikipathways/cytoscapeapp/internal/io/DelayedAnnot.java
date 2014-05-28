@@ -16,6 +16,11 @@ class DelayedAnnot {
   final Map<String,String> argMap;
   final Shape shape;
 
+  public static DelayedAnnot newShape(final Map<String,String> argMap) {
+    //System.out.println("newShape: " + argMap);
+    return new DelayedAnnot(Type.SHAPE, null, argMap);
+  }
+
   public static DelayedAnnot newShape(final Shape shape, final Map<String,String> argMap) {
     return new DelayedAnnot(Type.SHAPE, shape, argMap);
   }

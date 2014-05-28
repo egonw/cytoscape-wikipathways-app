@@ -760,6 +760,8 @@ public class GpmlToPathway {
       final Object cyVal = extracter.extract(pvElem);
       if (cyVal != null) {
         cyArgMap.put(key, cyVal.toString());
+      } else {
+        cyArgMap.put(key, null);
       }
     }
   }
@@ -961,13 +963,15 @@ public class GpmlToPathway {
 
   static final Extracter GROUP_X_EXTRACTER = new Extracter() {
     public Object extract(final PathwayElement pvGroup) {
-      return pvGroup.getMCenterX();
+      final double w = pvGroup.getMWidth();
+      return pvGroup.getMCenterX() - w / 2.0;
     }
   };
 
   static final Extracter GROUP_Y_EXTRACTER = new Extracter() {
     public Object extract(final PathwayElement pvGroup) {
-      return pvGroup.getMCenterY();
+      final double h = pvGroup.getMHeight();
+      return pvGroup.getMCenterY() - h / 2.0;
     }
   };
   
@@ -988,9 +992,11 @@ public class GpmlToPathway {
       final String styleName = (String) pvValues[0];
       final GroupStyle style = styleName != null ? GroupStyle.fromName(styleName) : null;
       if (GroupStyle.GROUP.equals(style))
-        return Color.WHITE;
+        return 0xffffff;
+      else if (GroupStyle.PATHWAY.equals(style))
+        return 0xf3fff3;
       else
-        return new Color(0xefefef);
+        return 0xefefef;
     }
   };
 
@@ -1001,24 +1007,25 @@ public class GpmlToPathway {
       final String styleName = (String) pvValues[0];
       final GroupStyle style = styleName != null ? GroupStyle.fromName(styleName) : null;
       if (GroupStyle.GROUP.equals(style))
-        return 0.0;
+        return "0.0";
       else
-        return 1.0;
+        return "1.0";
     }
   };
 
   static final Extracter GROUP_BORDER_THICKNESS_EXTRACTER = new BasicExtracter(GROUP_BORDER_THICKNESS_CONVERTER, StaticProperty.GROUPSTYLE);
 
-  static final VizPropStore GROUP_X                 = new BasicVizPropStore(GROUP_X_EXTRACTER,                                    BasicVisualLexicon.NODE_X_LOCATION);
-  static final VizPropStore GROUP_Y                 = new BasicVizPropStore(GROUP_Y_EXTRACTER,                                    BasicVisualLexicon.NODE_Y_LOCATION);
+  static final ArgMapStore GROUP_X                 = new BasicArgMapStore(GROUP_X_EXTRACTER,                                    Annotation.X);
+  static final ArgMapStore GROUP_Y                 = new BasicArgMapStore(GROUP_Y_EXTRACTER,                                    Annotation.Y);
   static final VizPropStore SELECTED_COLOR          = new BasicVizPropStore(new DefaultExtracter(new Color(255, 255, 204, 127)),  BasicVisualLexicon.NODE_SELECTED_PAINT);
-  static final VizPropStore GROUP_WIDTH             = new BasicVizPropStore(GROUP_W_EXTRACTER,                                    BasicVisualLexicon.NODE_WIDTH);
-  static final VizPropStore GROUP_HEIGHT            = new BasicVizPropStore(GROUP_H_EXTRACTER,                                    BasicVisualLexicon.NODE_HEIGHT);
-  static final VizPropStore GROUP_FILL_COLOR        = new BasicVizPropStore(GROUP_FILL_COLOR_EXTRACTER,                           BasicVisualLexicon.NODE_FILL_COLOR);
-  static final VizPropStore GROUP_COLOR             = new BasicVizPropStore(new DefaultExtracter(new Color(0xaaaaaa)),            BasicVisualLexicon.NODE_LABEL_COLOR, BasicVisualLexicon.NODE_BORDER_PAINT);
-  static final VizPropStore GROUP_BORDER_THICKNESS  = new BasicVizPropStore(GROUP_BORDER_THICKNESS_EXTRACTER,                     BasicVisualLexicon.NODE_BORDER_WIDTH);
-  static final VizPropStore GROUP_BORDER_STYLE      = new BasicVizPropStore(new DefaultExtracter("Dots"), PV_LINE_STYLE_MAP,      BasicVisualLexicon.NODE_BORDER_LINE_TYPE);
-  static final VizPropStore GROUP_SHAPE             = new BasicVizPropStore(new DefaultExtracter("Rectangle"), PV_SHAPE_MAP,      BasicVisualLexicon.NODE_SHAPE);
+  static final ArgMapStore GROUP_WIDTH             = new BasicArgMapStore(GROUP_W_EXTRACTER,                                    ShapeAnnotation.WIDTH);
+  static final ArgMapStore GROUP_HEIGHT            = new BasicArgMapStore(GROUP_H_EXTRACTER,                                    ShapeAnnotation.HEIGHT);
+  static final ArgMapStore GROUP_FILL_COLOR        = new BasicArgMapStore(GROUP_FILL_COLOR_EXTRACTER,                           ShapeAnnotation.FILLCOLOR);
+  static final ArgMapStore GROUP_FILL_OPACITY  = new BasicArgMapStore(new DefaultExtracter(20.0),                     ShapeAnnotation.FILLOPACITY);
+  static final ArgMapStore GROUP_BORDER_COLOR             = new BasicArgMapStore(new DefaultExtracter(0xaaaaaa),                       ShapeAnnotation.EDGECOLOR);
+  static final ArgMapStore GROUP_BORDER_THICKNESS  = new BasicArgMapStore(GROUP_BORDER_THICKNESS_EXTRACTER,                     ShapeAnnotation.EDGETHICKNESS);
+  static final ArgMapStore GROUP_SHAPE             = new BasicArgMapStore(new DefaultExtracter("Rectangle"),                    ShapeAnnotation.SHAPETYPE);
+  static final ArgMapStore GROUP_CANVAS_ARG_STORE = new BasicArgMapStore(new DefaultExtracter(ShapeAnnotation.BACKGROUND), ShapeAnnotation.CANVAS);
 
   private void convertGroups() {
     for (final PathwayElement pvElem : pvPathway.getDataObjects()) {
@@ -1032,22 +1039,20 @@ public class GpmlToPathway {
   }
 
   private void convertGroup(final PathwayElement pvGroup) {
-    final CyNode cyGroupNode = cyNet.addNode();
-    pvToCyNodes.put(pvGroup, cyGroupNode);
-
-    store(cyGroupNode, pvGroup,
+    final DelayedAnnot delayedAnnot = DelayedAnnot.newShape(store(pvGroup,
       GROUP_X,
       GROUP_Y,
-      SELECTED_COLOR,
       GROUP_WIDTH,
       GROUP_HEIGHT,
-      GROUP_COLOR,
+      GROUP_BORDER_COLOR,
       GROUP_FILL_COLOR,
+      GROUP_FILL_OPACITY,
       GROUP_BORDER_THICKNESS,
-      GROUP_BORDER_STYLE,
-      BasicVizPropStore.NODE_ALWAYS_TRANSPARENT,
-      GROUP_SHAPE 
-    );
+      GROUP_SHAPE,
+      GROUP_CANVAS_ARG_STORE
+    ));
+    cyDelayedAnnots.add(delayedAnnot);
+    pvToCyAnnots.put(pvGroup, delayedAnnot);
   }
 
   /*
