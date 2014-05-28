@@ -6,6 +6,8 @@ import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.geom.AffineTransform;
 import java.awt.Shape;
+import java.awt.BasicStroke;
+import java.awt.Stroke;
 
 import java.util.Map;
 import java.util.HashMap;
@@ -742,7 +744,6 @@ public class GpmlToPathway {
     static final ArgMapStore Y = new BasicArgMapStore(BasicExtracter.START_Y_EST, Annotation.Y);
     static final ArgMapStore SHAPE_WIDTH = new BasicArgMapStore(BasicExtracter.WIDTH, ShapeAnnotation.WIDTH);
     static final ArgMapStore SHAPE_HEIGHT = new BasicArgMapStore(BasicExtracter.HEIGHT, ShapeAnnotation.HEIGHT);
-    //static final ArgMapStore SHAPE_ROTATION = new BasicArgMapStore(BasicExtracter.ROTATION, ShapeAnnotation.ROTATION);
     static final ArgMapStore SHAPE_FILL_COLOR = new BasicArgMapStore(BasicExtracter.FILL_COLOR_INT, ShapeAnnotation.FILLCOLOR);
     static final ArgMapStore SHAPE_BORDER_COLOR = new BasicArgMapStore(BasicExtracter.COLOR_INT, ShapeAnnotation.EDGECOLOR);
     static final ArgMapStore SHAPE_BORDER_THICKNESS = new BasicArgMapStore(BasicExtracter.NODE_LINE_THICKNESS, ShapeAnnotation.EDGETHICKNESS);
@@ -867,7 +868,6 @@ public class GpmlToPathway {
       BasicArgMapStore.SHAPE_FILL_COLOR,
       BasicArgMapStore.SHAPE_BORDER_COLOR,
       BasicArgMapStore.SHAPE_BORDER_THICKNESS,
-      //BasicArgMapStore.SHAPE_ROTATION,
       SHAPE_CANVAS_ARG_STORE
       ));
     cyDelayedAnnots.add(delayedAnnot);
@@ -878,7 +878,23 @@ public class GpmlToPathway {
     final Double originalW = (Double) pvShape.getStaticProperty(StaticProperty.WIDTH);
     final Double originalH = (Double) pvShape.getStaticProperty(StaticProperty.HEIGHT);
     final Shape originalShape = pvShape.getShapeType().getShape(originalW, originalH);
-    return originalShape;
+
+    final float thickness = (float) pvShape.getLineThickness();
+    final int pvLineStyle = pvShape.getLineStyle();
+    Shape strokedShape = originalShape;
+    if (LineStyle.SOLID == pvLineStyle) {
+      final Stroke stroke = new BasicStroke(thickness);
+      strokedShape = stroke.createStrokedShape(originalShape);
+    } else if (LineStyle.DASHED == pvLineStyle) {
+      final float dash[] = {10.0f, 10.0f};
+      final Stroke stroke = new BasicStroke(1.0f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_ROUND, 10.0f, dash, 0.0f);
+      strokedShape = stroke.createStrokedShape(originalShape);
+    } else if (LineStyle.DOUBLE == pvLineStyle) {
+      final Stroke inner = new BasicStroke(thickness);
+      final Stroke outer = new BasicStroke(thickness * 4.0f);
+      strokedShape = outer.createStrokedShape(inner.createStrokedShape(originalShape));
+    }
+    return strokedShape;
   }
 
   /*
