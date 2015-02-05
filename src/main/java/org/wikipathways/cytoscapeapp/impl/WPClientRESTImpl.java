@@ -2,7 +2,8 @@ package org.wikipathways.cytoscapeapp.impl;
 
 import java.util.ArrayList;
 import java.util.List;
-
+import java.io.ByteArrayInputStream;
+import java.io.InputStreamReader;
 import java.io.Reader;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -12,20 +13,19 @@ import java.io.ObjectInputStream;
 import java.io.InputStream;
 import java.io.StringReader;
 import java.io.IOException;
-
 import java.net.URI;
 import java.net.ProxySelector;
 
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.ParserConfigurationException;
+
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXParseException;
-
 import org.apache.http.impl.client.HttpClientBuilder;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.conn.SystemDefaultRoutePlanner;
@@ -40,13 +40,12 @@ import org.apache.http.HttpEntity;
 
 import org.cytoscape.work.TaskMonitor;
 import org.cytoscape.application.CyApplicationConfiguration;
-
 import org.wikipathways.cytoscapeapp.WPClient;
 import org.wikipathways.cytoscapeapp.WPPathway;
 import org.wikipathways.cytoscapeapp.ResultTask;
 
 public class WPClientRESTImpl implements WPClient {
-  protected static final String BASE_URL = "http://www.wikipathways.org/wpi/webservice/webservice.php/";
+  protected static final String BASE_URL = "http://webservice.wikipathways.org/";
 
   final CyApplicationConfiguration appConf;
 
@@ -93,6 +92,7 @@ public class WPClientRESTImpl implements WPClient {
       } catch (Exception e) {
         throw new IllegalArgumentException("Invalid URL request", e);
       }
+      System.out.println("URI: " + uri);
       req = new HttpGet(uri);
 
       // issue the request
@@ -273,10 +273,22 @@ public class WPClientRESTImpl implements WPClient {
         if (super.cancelled)
           return null;
         final Node responseNode = doc.getFirstChild();
-        final Node resultNode = responseNode.getFirstChild(); 
+        final Node resultNode = getFirstNonWhitespaceChild(responseNode);
         return parsePathwayInfo(resultNode);
       }
+
     };
+  }
+
+  private Node getFirstNonWhitespaceChild(Node node) {
+    final NodeList resultNodes = node.getChildNodes();
+    int childCounter = 1;
+    Node resultNode = resultNodes.item(childCounter);
+    while (resultNode.getNodeType() == Node.TEXT_NODE) {
+      childCounter++;
+      resultNode = resultNodes.item(childCounter);
+    }
+    return resultNode;
   }
 
   protected static Node findChildNode(final Node parentNode, final String nodeName) {
@@ -302,10 +314,10 @@ public class WPClientRESTImpl implements WPClient {
         if (super.cancelled)
           return null;
         final Node responseNode = doc.getFirstChild();
-        final Node pathwayNode = responseNode.getFirstChild(); 
+        final Node pathwayNode = findChildNode(responseNode, "ns1:pathway");
         final Node gpmlNode = findChildNode(pathwayNode, "ns2:gpml");
-        final String gpmlContents = gpmlNode.getTextContent();
-        return new StringReader(gpmlContents);
+        byte[] decoded = Base64.decode(gpmlNode.getTextContent().trim());
+        return new InputStreamReader(new ByteArrayInputStream(decoded));
       }
     };
   }
